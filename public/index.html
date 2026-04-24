@@ -125,7 +125,7 @@ let S = {
   curAdj: null,
   isFinal: false,
   totalRounds: 5,
-  cdSec: 8,
+  cdSec: 3,
   cdTimer: null,
   answers: [],
   roundScores: {},
@@ -201,12 +201,10 @@ function handleMsg(msg) {
       if (S.answerTimer) { clearInterval(S.answerTimer); S.answerTimer = null; }
       S.curRound  = msg.round;
       S.totalRounds = msg.totalRounds;
-      S.curTheme  = msg.theme;
-      S.curAdj    = msg.adj;
       S.isFinal   = msg.isFinal;
-      S.cdSec     = 8;
       S.answered  = false;
       S.voted     = false;
+      S.cdSec     = 3;
       S.screen    = 'countdown';
       S.cdTimer   = setInterval(() => {
         S.cdSec--;
@@ -214,7 +212,7 @@ function handleMsg(msg) {
         const a = document.getElementById('cd-arc');
         if (n) n.textContent = S.cdSec;
         const circ = 2 * Math.PI * 54;
-        if (a) a.style.strokeDashoffset = (circ * S.cdSec / 8).toFixed(1);
+        if (a) a.style.strokeDashoffset = (circ * S.cdSec / 3).toFixed(1);
         if (S.cdSec <= 0) { clearInterval(S.cdTimer); S.cdTimer = null; }
       }, 1000);
       break;
@@ -222,6 +220,8 @@ function handleMsg(msg) {
     case 'answerPhase':
       if (S.cdTimer) { clearInterval(S.cdTimer); S.cdTimer = null; }
       if (S.answerTimer) { clearInterval(S.answerTimer); S.answerTimer = null; }
+      S.curTheme = msg.theme;
+      S.curAdj = msg.adj;
       S.answerInput = '';
       S.answerSec = msg.answerSec;
       S.answerRemain = msg.answerSec;
@@ -529,24 +529,11 @@ function renderThemeReview() {
 
 function renderCountdown() {
   const r = 54, circ = (2 * Math.PI * r).toFixed(1);
-  const offset = (circ * S.cdSec / 8).toFixed(1);
+  const offset = (circ * S.cdSec / 3).toFixed(1);
   return `
-    <div class="tc" style="padding:0.5rem 0">
-      <div class="row" style="justify-content:center;gap:8px;margin-bottom:20px">
-        <div class="badge">ROUND ${S.curRound} / ${S.totalRounds}</div>
-        ${S.isFinal ? '<div class="badge badge-accent">FINAL × 2倍</div>' : ''}
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:28px">
-        <div class="keyword-box">
-          <div class="kw-label">テーマ</div>
-          <div class="kw-main" style="font-size:20px">${esc(S.curTheme?.name)}</div>
-          <div style="margin-top:4px">${stars(S.curTheme?.s||1)}</div>
-        </div>
-        <div class="keyword-box">
-          <div class="kw-label">形容詞</div>
-          <div class="kw-main accent" style="font-size:18px">${esc(S.curAdj)}</div>
-        </div>
-      </div>
+    <div class="tc" style="padding:2rem 0">
+      <div class="badge mb20">ROUND ${S.curRound} / ${S.totalRounds}${S.isFinal ? ' - FINAL' : ''}</div>
+      <p style="font-size:18px; font-weight:700; margin-bottom:28px">準備して！</p>
       <div class="cd-wrap">
         <svg width="128" height="128">
           <circle cx="64" cy="64" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
@@ -557,7 +544,7 @@ function renderCountdown() {
         </svg>
         <span id="cd-num" class="cd-num">${S.cdSec}</span>
       </div>
-      <p class="dim small mt16">頭の中で答えを考えよう！</p>
+      <p class="dim small mt16">もうすぐテーマが表示されます</p>
     </div>
   `;
 }

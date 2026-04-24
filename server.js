@@ -90,16 +90,20 @@ function startRound(room) {
     type: 'roundStart',
     round: room.round,
     totalRounds: room.totalRounds,
-    theme, adj,
     isFinal: room.round === room.totalRounds
   });
 
   clearTimers(room);
   room.cdTimer = setTimeout(() => {
     room.phase = 'answer';
-    bcast(room, { type: 'answerPhase', answerSec: room.answerSec });
+    bcast(room, {
+      type: 'answerPhase',
+      answerSec: room.answerSec,
+      theme: room.curTheme,
+      adj: room.curAdj,
+    });
     room.ansTimer = setTimeout(() => finalizeAnswers(room), room.answerSec * 1000);
-  }, 8000);
+  }, 3000);
 }
 
 function finalizeAnswers(room) {
