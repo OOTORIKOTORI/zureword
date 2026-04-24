@@ -107,10 +107,19 @@ let S = {
   nameInput: '',
   roomInput: '',
   mode: 'create',      // create | join
+  cfgRounds: 5,
+  cfgAnswerSec: 30,
+  cfgThemePerPlayer: 2,
+  cfgCommonThemeCount: 6,
+  settings: { totalRounds: 5, answerSec: 30, themePerPlayer: 2, commonThemeCount: 6 },
   players: [],
   themes: [],
   t0: '', t1: '',      // theme inputs
+  themePerPlayer: 2,
   answerInput: '',
+  answerSec: 30,
+  answerRemain: 30,
+  answerTimer: null,
   curRound: null,
   curTheme: null,
   curAdj: null,
@@ -155,6 +164,11 @@ function handleMsg(msg) {
       S.roomId = msg.rid;
       S.isHost = msg.isHost;
       S.players = msg.players;
+      S.settings = msg.settings || S.settings;
+      S.totalRounds = S.settings.totalRounds;
+      S.themePerPlayer = S.settings.themePerPlayer;
+      S.answerSec = S.settings.answerSec;
+      S.answerRemain = S.settings.answerSec;
       S.screen = 'lobby';
       break;
 
@@ -165,9 +179,10 @@ function handleMsg(msg) {
 
     case 'themePhase':
       S.players = msg.players;
-      S.screen = 'theme_submit';
+      S.themePerPlayer = msg.themePerPlayer;
       S.themeSubmitted = false;
       S.t0 = ''; S.t1 = '';
+      S.screen = 'theme_submit';
       break;
 
     case 'themeProgress': {
@@ -183,6 +198,7 @@ function handleMsg(msg) {
 
     case 'roundStart':
       if (S.cdTimer) clearInterval(S.cdTimer);
+      if (S.answerTimer) { clearInterval(S.answerTimer); S.answerTimer = null; }
       S.curRound  = msg.round;
       S.totalRounds = msg.totalRounds;
       S.curTheme  = msg.theme;
@@ -205,11 +221,28 @@ function handleMsg(msg) {
 
     case 'answerPhase':
       if (S.cdTimer) { clearInterval(S.cdTimer); S.cdTimer = null; }
+      if (S.answerTimer) { clearInterval(S.answerTimer); S.answerTimer = null; }
       S.answerInput = '';
+      S.answerSec = msg.answerSec;
+      S.answerRemain = msg.answerSec;
       S.screen = 'answer';
+      S.answerTimer = setInterval(() => {
+        S.answerRemain--;
+        const el = document.getElementById('answer-remain');
+        if (el) {
+          el.textContent = S.answerRemain;
+          el.style.color = S.answerRemain <= 10 ? 'var(--danger)' : 'var(--text)';
+        }
+        if (S.answerRemain <= 0) {
+          clearInterval(S.answerTimer);
+          S.answerTimer = null;
+          render();
+        }
+      }, 1000);
       break;
 
     case 'answerAccepted':
+      if (S.answerTimer) { clearInterval(S.answerTimer); S.answerTimer = null; }
       S.answered = true;
       S.screen = 'answer_waiting';
       break;
@@ -220,6 +253,7 @@ function handleMsg(msg) {
       break;
 
     case 'votingPhase':
+      if (S.answerTimer) { clearInterval(S.answerTimer); S.answerTimer = null; }
       S.answers   = msg.answers;
       S.curTheme  = msg.theme;
       S.curAdj    = msg.adj;
@@ -302,6 +336,15 @@ function handleAction(e) {
 
   if (a === 'setCreate') { S.mode = 'create'; render(); return; }
   if (a === 'setJoin')   { S.mode = 'join';   render(); return; }
+  if (a === 'setCfg') {
+    const key = d.key;
+    const val = Number(d.val);
+    if (Object.prototype.hasOwnProperty.call(S, key) && Number.isFinite(val)) {
+      S[key] = val;
+      render();
+    }
+    return;
+  }
 
   if (a === 'connect') {
     const name = (document.getElementById('nameInput')?.value || S.nameInput).trim();
@@ -309,7 +352,13 @@ function handleAction(e) {
     S.nameInput = name;
     connect(() => {
       if (S.mode === 'create') {
-        wsSend({ type: 'create', name });
+        wsSend({
+          type: 'create', name,
+          totalRounds: S.cfgRounds,
+          answerSec: S.cfgAnswerSec,
+          themePerPlayer: S.cfgThemePerPlayer,
+          commonThemeCount: S.cfgCommonThemeCount,
+        });
       } else {
         const rid = (document.getElementById('roomInput')?.value || S.roomInput).trim().toUpperCase();
         if (!rid) return showToast('ルームIDを入力してください');
@@ -320,10 +369,13 @@ function handleAction(e) {
   }
   if (a === 'startTheme') { wsSend({ type: 'startTheme' }); return; }
   if (a === 'submitThemes') {
-    const t0 = (document.getElementById('t0')?.value || S.t0).trim();
-    const t1 = (document.getElementById('t1')?.value || S.t1).trim();
-    const themes = [t0, t1].filter(Boolean);
-    if (themes.length === 0) return showToast('テーマを1つ以上入力してください');
+    const vals = [];
+    for (let i = 0; i < S.themePerPlayer; i++) {
+      const key = `t${i}`;
+      vals.push((document.getElementById(key)?.value || S[key] || '').trim());
+    }
+    const themes = vals.filter(Boolean);
+    if (S.themePerPlayer > 0 && themes.length === 0) return showToast('テーマを1つ以上入力してください');
     S.themeSubmitted = true;
     wsSend({ type: 'submitThemes', themes });
     return;
@@ -350,6 +402,14 @@ function stars(n) {
 
 function renderConnect() {
   const isCreate = S.mode === 'create';
+  const toggleRow = (label, key, opts, suffix = '') => `
+    <div class="mb12">
+      <div class="small dim mb4">${label}</div>
+      <div class="row" style="gap:6px;flex-wrap:wrap">
+        ${opts.map(v => `<button data-a="setCfg" data-key="${key}" data-val="${v}" class="btn-small" style="padding:8px 12px;${S[key] === v ? 'background:var(--accent);color:#fff' : ''}">${v}${suffix}</button>`).join('')}
+      </div>
+    </div>
+  `;
   return `
     <div class="mb24">
       <div class="badge mb12">WORD GAME</div>
@@ -361,6 +421,15 @@ function renderConnect() {
       <button data-a="setJoin"   style="flex:1;padding:10px;border-radius:0;${!isCreate?'background:var(--accent);color:#1a1a1f':'background:transparent;color:var(--text2)'}">ルーム参加</button>
     </div>
     <input id="nameInput" type="text" placeholder="名前（10文字以内）" maxlength="10" value="${esc(S.nameInput)}" class="mb8" autocomplete="off"/>
+    ${isCreate ? `
+      <div class="card mb12">
+        <p class="small dim mb8">ホスト設定</p>
+        ${toggleRow('ラウンド数', 'cfgRounds', [3, 5, 7])}
+        ${toggleRow('回答時間', 'cfgAnswerSec', [15, 30, 60], '秒')}
+        ${toggleRow('テーマ提出数/人', 'cfgThemePerPlayer', [0, 1, 2], '枚')}
+        ${toggleRow('共通テーマ数', 'cfgCommonThemeCount', [0, 3, 6, 12], '枚')}
+      </div>
+    ` : ''}
     ${!isCreate ? `<input id="roomInput" type="text" placeholder="ルームID（4文字）" maxlength="4" value="${esc(S.roomInput)}" class="mb8" autocomplete="off" style="text-transform:uppercase;letter-spacing:4px;font-family:'DM Mono',monospace;font-size:18px"/>` : ''}
     <button class="btn-primary mt8" data-a="connect">${isCreate ? 'ルームを作る' : '参加する'}</button>
   `;
@@ -382,6 +451,9 @@ function renderLobby() {
       <h2 class="mb4">ルームID</h2>
       <div class="room-code">${esc(S.roomId)}</div>
       <p class="dim small tc">このIDを友達に共有してください</p>
+      <p class="dim small tc mt8">
+        ${S.settings.totalRounds}ラウンド ｜ 回答${S.settings.answerSec}秒 ｜ テーマ${S.settings.themePerPlayer}枚/人 ｜ 共通${S.settings.commonThemeCount}枚
+      </p>
     </div>
     <p style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">プレイヤー ${S.players.length}/5</p>
     ${pl}
@@ -394,15 +466,24 @@ function renderLobby() {
 }
 
 function renderThemeSubmit() {
+  const inputs = [];
+  for (let i = 0; i < S.themePerPlayer; i++) {
+    const key = `t${i}`;
+    const label = i + 1;
+    const optional = i === 0 ? '' : '（任意）';
+    inputs.push(`<input id="${key}" type="text" placeholder="テーマ${label}${optional}" maxlength="20" value="${esc(S[key] || '')}" class="mb8" autocomplete="off"/>`);
+  }
+  const help = S.themePerPlayer === 0
+    ? '今回は個別テーマ提出なしです'
+    : `${S.themePerPlayer}つまで入力できます（名詞のみ・20文字以内）`;
   return `
     <div class="mb20">
       <div class="badge mb12">THEME INPUT</div>
       <h2 class="mb4">テーマを入力</h2>
-      <p class="dim small">2つまで入力できます（名詞のみ・20文字以内）</p>
+      <p class="dim small">${help}</p>
     </div>
-    <input id="t0" type="text" placeholder="テーマ1（例：食べ物）" maxlength="20" value="${esc(S.t0)}" class="mb8" autocomplete="off"/>
-    <input id="t1" type="text" placeholder="テーマ2（任意）"       maxlength="20" value="${esc(S.t1)}" class="mb24" autocomplete="off"/>
-    <button class="btn-primary" data-a="submitThemes">送信する →</button>
+    ${inputs.join('')}
+    <button class="btn-primary ${S.themePerPlayer > 0 ? 'mt12' : 'mt24'}" data-a="submitThemes">${S.themePerPlayer === 0 ? 'テーマなしで送信' : '送信する →'}</button>
   `;
 }
 
@@ -421,7 +502,7 @@ function renderThemeWaiting() {
 }
 
 function renderThemeReview() {
-  const ok = S.themes.length >= 5;
+  const ok = S.themes.length >= S.totalRounds;
   const items = S.themes.map(t => `
     <div class="player-row mb6">
       <div class="row" style="gap:8px">
@@ -435,7 +516,7 @@ function renderThemeReview() {
     <div class="mb20">
       <div class="badge mb12">THEME REVIEW</div>
       <h2 class="mb4">テーマ確認</h2>
-      <p class="dim small">${S.themes.length}個のテーマ（5ラウンド分必要）</p>
+      <p class="dim small">${S.themes.length}個のテーマ（${S.totalRounds}ラウンド分必要）</p>
     </div>
     <div style="max-height:55vh;overflow-y:auto;margin-bottom:12px">${items}</div>
     ${S.isHost
@@ -482,10 +563,28 @@ function renderCountdown() {
 }
 
 function renderAnswer() {
+  if (S.answerRemain <= 0) {
+    return `
+      <div class="mb20">
+        <div class="badge mb12">YOUR ANSWER</div>
+        <h2 class="mb4">回答してください</h2>
+      </div>
+      <div style="text-align:center; margin-bottom:16px;">
+        残り <span id="answer-remain" style="font-size:24px; font-weight:700; color:var(--danger);">0</span> 秒
+      </div>
+      <div style="text-align:center; padding:2rem 0;">
+        <p style="font-size:24px;">⏰ 時間切れ！</p>
+        <p class="dim small">結果を待っています...</p>
+      </div>
+    `;
+  }
   return `
     <div class="mb20">
       <div class="badge mb12">YOUR ANSWER</div>
       <h2 class="mb4">回答してください</h2>
+    </div>
+    <div style="text-align:center; margin-bottom:16px;">
+      残り <span id="answer-remain" style="font-size:24px; font-weight:700;">${S.answerRemain}</span> 秒
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
       <div class="keyword-box">

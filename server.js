@@ -67,6 +67,11 @@ function clearTimers(room) {
   if (room.ansTimer) { clearTimeout(room.ansTimer); room.ansTimer = null; }
 }
 
+function sampleThemes(n) {
+  const shuffled = [...BASE_THEMES].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, n).map(t => ({ ...t }));
+}
+
 // ─── Game Logic ───────────────────────────────────────────────────────────────
 
 function startRound(room) {
@@ -94,9 +99,8 @@ function startRound(room) {
   clearTimers(room);
   room.cdTimer = setTimeout(() => {
     room.phase = 'answer';
-    bcast(room, { type: 'answerPhase' });
-    // 90秒で強制締め切り
-    room.ansTimer = setTimeout(() => finalizeAnswers(room), 90000);
+    bcast(room, { type: 'answerPhase', answerSec: room.answerSec });
+    room.ansTimer = setTimeout(() => finalizeAnswers(room), room.answerSec * 1000);
   }, 8000);
 }
 
@@ -188,14 +192,33 @@ wss.on('connection', ws => {
         const r = {
           id: rid, hostId: pid, phase: 'lobby',
           players: new Map([[pid, player]]),
-          themes: BASE_THEMES.map(t => ({ ...t })),
-          usedThemes: [], round: 0, totalRounds: 5,
+          totalRounds: 5,
+          answerSec: 30,
+          themePerPlayer: 2,
+          commonThemeCount: 6,
+          themes: sampleThemes(6),
+          usedThemes: [], round: 0,
           curTheme: null, curAdj: null,
           answers: new Map(), votes: new Map(),
           cdTimer: null, ansTimer: null
         };
+        r.totalRounds = [3, 5, 7].includes(msg.totalRounds) ? msg.totalRounds : 5;
+        r.answerSec = [15, 30, 60].includes(msg.answerSec) ? msg.answerSec : 30;
+        r.themePerPlayer = [0, 1, 2].includes(msg.themePerPlayer) ? msg.themePerPlayer : 2;
+        r.commonThemeCount = (Number.isInteger(msg.commonThemeCount) && msg.commonThemeCount >= 0 && msg.commonThemeCount <= BASE_THEMES.length)
+          ? msg.commonThemeCount
+          : 6;
+        r.themes = sampleThemes(r.commonThemeCount);
         rooms.set(rid, r);
-        send(ws, { type: 'joined', pid, rid, isHost: true, players: pubPlayers(r) });
+        send(ws, {
+          type: 'joined', pid, rid, isHost: true, players: pubPlayers(r),
+          settings: {
+            totalRounds: r.totalRounds,
+            answerSec: r.answerSec,
+            themePerPlayer: r.themePerPlayer,
+            commonThemeCount: r.commonThemeCount,
+          }
+        });
         break;
       }
 
@@ -211,7 +234,15 @@ wss.on('connection', ws => {
         rid = r.id;
         const player = { id: pid, name, ws, score: 0, used: new Set(), answered: false, voted: false, themeSubmitted: false };
         r.players.set(pid, player);
-        send(ws, { type: 'joined', pid, rid, isHost: false, players: pubPlayers(r) });
+        send(ws, {
+          type: 'joined', pid, rid, isHost: false, players: pubPlayers(r),
+          settings: {
+            totalRounds: r.totalRounds,
+            answerSec: r.answerSec,
+            themePerPlayer: r.themePerPlayer,
+            commonThemeCount: r.commonThemeCount,
+          }
+        });
         bcast(r, { type: 'playerJoined', players: pubPlayers(r) }, pid);
         break;
       }
@@ -220,7 +251,7 @@ wss.on('connection', ws => {
         if (!room || room.hostId !== pid) return;
         if (room.players.size < 2) return send(ws, { type: 'error', message: '2人以上必要です' });
         room.phase = 'theme_submit';
-        bcast(room, { type: 'themePhase', players: pubPlayers(room) });
+        bcast(room, { type: 'themePhase', players: pubPlayers(room), themePerPlayer: room.themePerPlayer });
         break;
       }
 
@@ -228,7 +259,7 @@ wss.on('connection', ws => {
         if (!room || room.phase !== 'theme_submit') return;
         const p = room.players.get(pid);
         if (!p || p.themeSubmitted) return;
-        const themes = (msg.themes || []).map(t => (t || '').trim().slice(0, 20)).filter(Boolean).slice(0, 2);
+        const themes = (msg.themes || []).map(t => (t || '').trim().slice(0, 20)).filter(Boolean).slice(0, room.themePerPlayer);
         for (const t of themes) room.themes.push({ name: t, s: 2 });
         p.themeSubmitted = true;
         const done = [...room.players.values()].filter(p => p.themeSubmitted).length;
