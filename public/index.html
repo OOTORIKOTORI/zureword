@@ -122,6 +122,7 @@ let S = {
   voteCount: 0, voteTotal: 0,
   voted: false,
   answered: false,
+  themeSubmitted: false,
 };
 
 // ─── WebSocket ────────────────────────────────────────────────────────────────
@@ -162,11 +163,12 @@ function handleMsg(msg) {
     case 'themePhase':
       S.players = msg.players;
       S.screen = 'theme_submit';
+      S.themeSubmitted = false;
       S.t0 = ''; S.t1 = '';
       break;
 
     case 'themeProgress': {
-      S.screen = 'theme_waiting';
+      if (S.themeSubmitted === true) S.screen = 'theme_waiting';
       S.ansCount = msg.done; S.ansTotal = msg.total;
       break;
     }
@@ -317,6 +319,7 @@ function handleAction(e) {
   if (a === 'submitThemes') {
     const t0 = (document.getElementById('t0')?.value || S.t0).trim();
     const t1 = (document.getElementById('t1')?.value || S.t1).trim();
+    S.themeSubmitted = true;
     wsSend({ type: 'submitThemes', themes: [t0, t1].filter(Boolean) });
     return;
   }
