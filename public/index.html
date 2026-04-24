@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>発想ゲーム</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0f11; --bg2: #1a1a1f; --bg3: #25252c;
+    --border: rgba(255,255,255,0.1); --border2: rgba(255,255,255,0.18);
+    --text: #f0f0f2; --text2: #8888a0; --text3: #555568;
+    --accent: #c8f03c; --accent-dim: rgba(200,240,60,0.12); --accent-border: rgba(200,240,60,0.35);
+    --danger: #ff5f5f; --danger-dim: rgba(255,95,95,0.12);
+    --success: #4cf0a0; --radius: 12px; --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); font-family: 'Noto Sans JP', sans-serif; color: var(--text); font-size: 15px; line-height: 1.5; overscroll-behavior: none; }
+  body { display: flex; flex-direction: column; align-items: center; }
+  #app { width: 100%; max-width: 420px; min-height: 100vh; padding: 24px 16px 48px; }
+
+  h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+  h2 { font-size: 20px; font-weight: 500; }
+  .dim { color: var(--text2); }
+  .small { font-size: 12px; }
+  .mono { font-family: 'DM Mono', monospace; }
+
+  .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .card-accent { background: var(--accent-dim); border: 1px solid var(--accent-border); border-radius: var(--radius); padding: 16px; }
+
+  button { font-family: 'Noto Sans JP', sans-serif; cursor: pointer; border: none; border-radius: var(--radius-sm); font-size: 14px; font-weight: 500; transition: all 0.15s; }
+  .btn-primary { background: var(--accent); color: #1a1a1f; padding: 14px 20px; width: 100%; font-size: 15px; }
+  .btn-primary:hover { filter: brightness(1.1); }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; filter: none; }
+  .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); padding: 12px 20px; width: 100%; }
+  .btn-ghost:hover { background: var(--bg3); color: var(--text); border-color: var(--border2); }
+  .btn-danger { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(255,95,95,0.25); padding: 6px 10px; font-size: 13px; border-radius: 6px; }
+  .btn-small { background: var(--bg3); color: var(--text2); border: 1px solid var(--border); padding: 8px 14px; font-size: 13px; }
+  .btn-small:hover { background: var(--bg2); color: var(--text); }
+
+  input[type="text"] { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-family: 'Noto Sans JP', sans-serif; font-size: 15px; padding: 12px 14px; width: 100%; outline: none; transition: border-color 0.15s; }
+  input[type="text"]:focus { border-color: var(--accent); }
+  input[type="text"]::placeholder { color: var(--text3); }
+
+  .row { display: flex; align-items: center; gap: 8px; }
+  .jb { justify-content: space-between; }
+  .tc { text-align: center; }
+  .mb4 { margin-bottom: 4px; } .mb8 { margin-bottom: 8px; } .mb12 { margin-bottom: 12px; } .mb16 { margin-bottom: 16px; } .mb20 { margin-bottom: 20px; } .mb24 { margin-bottom: 24px; }
+  .mt8 { margin-top: 8px; } .mt12 { margin-top: 12px; } .mt16 { margin-top: 16px; } .mt24 { margin-top: 24px; }
+  .f1 { flex: 1; }
+
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 100px; font-size: 11px; font-weight: 500; letter-spacing: 0.05em; background: var(--bg3); border: 1px solid var(--border); color: var(--text2); }
+  .badge-accent { background: var(--accent-dim); border-color: var(--accent-border); color: var(--accent); }
+  .badge-danger { background: var(--danger-dim); border-color: rgba(255,95,95,0.3); color: var(--danger); }
+
+  .stars-on { color: var(--accent); font-size: 11px; }
+  .stars-off { color: var(--text3); font-size: 11px; }
+
+  .player-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 6px; }
+  .avatar { width: 36px; height: 36px; border-radius: 50%; background: var(--bg3); border: 1px solid var(--border2); display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; color: var(--accent); flex-shrink: 0; }
+
+  .keyword-box { background: var(--bg3); border: 1px solid var(--border2); border-radius: var(--radius); padding: 20px; text-align: center; }
+  .kw-label { font-size: 10px; letter-spacing: 0.12em; color: var(--text3); text-transform: uppercase; margin-bottom: 6px; }
+  .kw-main { font-size: 26px; font-weight: 700; }
+  .kw-main.accent { color: var(--accent); }
+
+  .answer-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 8px; transition: all 0.3s; animation: fi 0.25s ease; }
+  .answer-row.dupe { opacity: 0.35; }
+  .vote-btn { display: flex; align-items: center; justify-content: space-between; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; cursor: pointer; width: 100%; transition: all 0.15s; text-align: left; margin-bottom: 8px; }
+  .vote-btn:hover { background: var(--bg3); border-color: var(--border2); }
+  .score-row { display: flex; align-items: center; justify-content: space-between; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px 16px; margin-bottom: 8px; }
+  .score-row.winner { background: var(--accent-dim); border-color: var(--accent-border); }
+  .cd-wrap { position: relative; display: inline-flex; align-items: center; justify-content: center; }
+  .cd-num { position: absolute; font-size: 48px; font-weight: 700; font-family: 'DM Mono', monospace; color: var(--accent); }
+  .waiting-pulse { display: inline-flex; gap: 4px; align-items: center; }
+  .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text3); animation: pulse 1.2s ease-in-out infinite; }
+  .dot:nth-child(2) { animation-delay: 0.2s; }
+  .dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes pulse { 0%,80%,100%{opacity:0.3} 40%{opacity:1} }
+  @keyframes fi { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+  .screen { animation: fi 0.2s ease; }
+
+  .room-code { font-family: 'DM Mono', monospace; font-size: 40px; font-weight: 500; letter-spacing: 12px; color: var(--accent); text-align: center; padding: 20px 0; }
+
+  .progress-bar-wrap { background: var(--bg3); border-radius: 100px; height: 4px; margin-top: 8px; overflow: hidden; }
+  .progress-bar { height: 100%; background: var(--accent); border-radius: 100px; transition: width 0.3s; }
+
+  .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: var(--danger); color: #fff; padding: 10px 20px; border-radius: var(--radius-sm); font-size: 14px; z-index: 999; animation: fi 0.2s ease; max-width: 320px; text-align: center; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast-wrap"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let ws = null;
+let S = {
+  screen: 'connect',   // connect | lobby | theme_submit | theme_waiting | theme_review | countdown | answer | answer_waiting | voting | vote_waiting | round_result | game_over
+  myId: null,
+  roomId: null,
+  isHost: false,
+  nameInput: '',
+  roomInput: '',
+  mode: 'create',      // create | join
+  players: [],
+  themes: [],
+  t0: '', t1: '',      // theme inputs
+  answerInput: '',
+  curRound: null,
+  curTheme: null,
+  curAdj: null,
+  isFinal: false,
+  totalRounds: 5,
+  cdSec: 8,
+  cdTimer: null,
+  answers: [],
+  roundScores: {},
+  totalScores: {},
+  ansCount: 0, ansTotal: 0,
+  voteCount: 0, voteTotal: 0,
+  voted: false,
+  answered: false,
+};
+
+// ─── WebSocket ────────────────────────────────────────────────────────────────
+function connect(cb) {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}`);
+  ws.onopen = cb;
+  ws.onmessage = e => {
+    const msg = JSON.parse(e.data);
+    handleMsg(msg);
+  };
+  ws.onclose = () => {
+    showToast('接続が切れました。ページを再読み込みしてください。', 5000);
+  };
+}
+
+function wsSend(msg) {
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify(msg));
+}
+
+// ─── Message Handler ──────────────────────────────────────────────────────────
+function handleMsg(msg) {
+  switch (msg.type) {
+
+    case 'joined':
+      S.myId   = msg.pid;
+      S.roomId = msg.rid;
+      S.isHost = msg.isHost;
+      S.players = msg.players;
+      S.screen = 'lobby';
+      break;
+
+    case 'playerJoined':
+    case 'playerLeft':
+      S.players = msg.players;
+      break;
+
+    case 'themePhase':
+      S.players = msg.players;
+      S.screen = 'theme_submit';
+      S.t0 = ''; S.t1 = '';
+      break;
+
+    case 'themeProgress': {
+      S.screen = 'theme_waiting';
+      S.ansCount = msg.done; S.ansTotal = msg.total;
+      break;
+    }
+
+    case 'themeReview':
+      S.themes = msg.themes;
+      S.screen = 'theme_review';
+      break;
+
+    case 'roundStart':
+      if (S.cdTimer) clearInterval(S.cdTimer);
+      S.curRound  = msg.round;
+      S.totalRounds = msg.totalRounds;
+      S.curTheme  = msg.theme;
+      S.curAdj    = msg.adj;
+      S.isFinal   = msg.isFinal;
+      S.cdSec     = 8;
+      S.answered  = false;
+      S.voted     = false;
+      S.screen    = 'countdown';
+      S.cdTimer   = setInterval(() => {
+        S.cdSec--;
+        const n = document.getElementById('cd-num');
+        const a = document.getElementById('cd-arc');
+        if (n) n.textContent = S.cdSec;
+        const circ = 2 * Math.PI * 54;
+        if (a) a.style.strokeDashoffset = (circ * S.cdSec / 8).toFixed(1);
+        if (S.cdSec <= 0) { clearInterval(S.cdTimer); S.cdTimer = null; }
+      }, 1000);
+      break;
+
+    case 'answerPhase':
+      if (S.cdTimer) { clearInterval(S.cdTimer); S.cdTimer = null; }
+      S.answerInput = '';
+      S.screen = 'answer';
+      break;
+
+    case 'answerAccepted':
+      S.answered = true;
+      S.screen = 'answer_waiting';
+      break;
+
+    case 'answerProgress':
+      S.ansCount = msg.count; S.ansTotal = msg.total;
+      if (S.screen === 'answer_waiting') { /* just update progress */ }
+      break;
+
+    case 'votingPhase':
+      S.answers   = msg.answers;
+      S.curTheme  = msg.theme;
+      S.curAdj    = msg.adj;
+      S.isFinal   = msg.isFinal;
+      S.voteCount = 0; S.voteTotal = S.players.length;
+      S.voted     = false;
+      S.screen    = 'voting';
+      break;
+
+    case 'voteProgress':
+      S.voteCount = msg.count; S.voteTotal = msg.total;
+      if (S.voted) S.screen = 'vote_waiting';
+      break;
+
+    case 'roundResult':
+      S.roundScores = msg.roundScores;
+      S.totalScores = msg.totalScores;
+      S.players     = msg.players;
+      S.curRound    = msg.round;
+      S.totalRounds = msg.totalRounds;
+      S.screen      = 'round_result';
+      break;
+
+    case 'gameOver':
+      S.players     = msg.players;
+      S.totalScores = msg.finalScores;
+      S.screen      = 'game_over';
+      break;
+
+    case 'error':
+      showToast(msg.message);
+      return;
+  }
+  render();
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────────
+const screens = {
+  connect:      renderConnect,
+  lobby:        renderLobby,
+  theme_submit: renderThemeSubmit,
+  theme_waiting:renderThemeWaiting,
+  theme_review: renderThemeReview,
+  countdown:    renderCountdown,
+  answer:       renderAnswer,
+  answer_waiting: renderAnswerWaiting,
+  voting:       renderVoting,
+  vote_waiting: renderVoteWaiting,
+  round_result: renderRoundResult,
+  game_over:    renderGameOver,
+};
+
+function render() {
+  const app = document.getElementById('app');
+  app.innerHTML = '<div class="screen">' + (screens[S.screen] || renderConnect)() + '</div>';
+  bindAll();
+  autoFocus();
+}
+
+function autoFocus() {
+  const f = document.getElementById('autofocus');
+  if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
+}
+
+function bindAll() {
+  document.querySelectorAll('[data-a]').forEach(el => el.addEventListener('click', handleAction));
+  ['nameInput','roomInput','t0','t1','answerInput'].forEach(k => {
+    const el = document.getElementById(k);
+    if (el) el.addEventListener('input', e => { S[k] = e.target.value; });
+  });
+  const nameInput = document.getElementById('nameInput');
+  if (nameInput) nameInput.addEventListener('keydown', e => { if (e.key==='Enter') handleAction({currentTarget:{dataset:{a:'connect'}}}); });
+  const ai = document.getElementById('answerInput');
+  if (ai) ai.addEventListener('keydown', e => { if (e.key==='Enter') handleAction({currentTarget:{dataset:{a:'submitAnswer'}}}); });
+}
+
+function handleAction(e) {
+  const a = e.currentTarget.dataset.a;
+  const d = e.currentTarget.dataset;
+
+  if (a === 'setCreate') { S.mode = 'create'; render(); return; }
+  if (a === 'setJoin')   { S.mode = 'join';   render(); return; }
+
+  if (a === 'connect') {
+    const name = (document.getElementById('nameInput')?.value || S.nameInput).trim();
+    if (!name) return showToast('名前を入力してください');
+    S.nameInput = name;
+    connect(() => {
+      if (S.mode === 'create') {
+        wsSend({ type: 'create', name });
+      } else {
+        const rid = (document.getElementById('roomInput')?.value || S.roomInput).trim().toUpperCase();
+        if (!rid) return showToast('ルームIDを入力してください');
+        wsSend({ type: 'join', name, rid });
+      }
+    });
+    return;
+  }
+  if (a === 'startTheme') { wsSend({ type: 'startTheme' }); return; }
+  if (a === 'submitThemes') {
+    const t0 = (document.getElementById('t0')?.value || S.t0).trim();
+    const t1 = (document.getElementById('t1')?.value || S.t1).trim();
+    wsSend({ type: 'submitThemes', themes: [t0, t1].filter(Boolean) });
+    return;
+  }
+  if (a === 'removeTheme') { wsSend({ type: 'removeTheme', name: d.name }); return; }
+  if (a === 'startGame')   { wsSend({ type: 'startGame' }); return; }
+  if (a === 'submitAnswer') {
+    const v = (document.getElementById('answerInput')?.value || S.answerInput).trim();
+    if (!v) return showToast('回答を入力してください');
+    wsSend({ type: 'submitAnswer', answer: v });
+    return;
+  }
+  if (a === 'vote')     { wsSend({ type: 'vote', targetId: d.tid }); S.voted = true; S.screen = 'vote_waiting'; render(); return; }
+  if (a === 'skipVote') { wsSend({ type: 'vote', targetId: null }); S.voted = true; S.screen = 'vote_waiting'; render(); return; }
+  if (a === 'nextRound') { wsSend({ type: 'nextRound' }); return; }
+  if (a === 'reload') { location.reload(); return; }
+}
+
+// ─── Screen Renderers ─────────────────────────────────────────────────────────
+
+function stars(n) {
+  return `<span class="stars-on">${'★'.repeat(n)}</span><span class="stars-off">${'★'.repeat(3-n)}</span>`;
+}
+
+function renderConnect() {
+  const isCreate = S.mode === 'create';
+  return `
+    <div class="mb24">
+      <div class="badge mb12">WORD GAME</div>
+      <h1 class="mb4">発想ゲーム</h1>
+      <p class="dim small">形容詞 × テーマで固有名詞を答えよう</p>
+    </div>
+    <div class="row mb20" style="gap:0;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+      <button data-a="setCreate" style="flex:1;padding:10px;border-radius:0;${isCreate?'background:var(--accent);color:#1a1a1f':'background:transparent;color:var(--text2)'}">ルーム作成</button>
+      <button data-a="setJoin"   style="flex:1;padding:10px;border-radius:0;${!isCreate?'background:var(--accent);color:#1a1a1f':'background:transparent;color:var(--text2)'}">ルーム参加</button>
+    </div>
+    <input id="nameInput" type="text" placeholder="名前（10文字以内）" maxlength="10" value="${esc(S.nameInput)}" class="mb8" autocomplete="off"/>
+    ${!isCreate ? `<input id="roomInput" type="text" placeholder="ルームID（4文字）" maxlength="4" value="${esc(S.roomInput)}" class="mb8" autocomplete="off" style="text-transform:uppercase;letter-spacing:4px;font-family:'DM Mono',monospace;font-size:18px"/>` : ''}
+    <button class="btn-primary mt8" data-a="connect">${isCreate ? 'ルームを作る' : '参加する'}</button>
+  `;
+}
+
+function renderLobby() {
+  const pl = S.players.map(p => `
+    <div class="player-row">
+      <div class="row" style="gap:12px">
+        <div class="avatar">${esc(p.name.charAt(0))}</div>
+        <span>${esc(p.name)}</span>
+        ${p.isHost ? '<span class="badge" style="font-size:10px">HOST</span>' : ''}
+        ${p.id === S.myId ? '<span class="dim small">（あなた）</span>' : ''}
+      </div>
+    </div>`).join('');
+  return `
+    <div class="mb20">
+      <div class="badge mb12">LOBBY</div>
+      <h2 class="mb4">ルームID</h2>
+      <div class="room-code">${esc(S.roomId)}</div>
+      <p class="dim small tc">このIDを友達に共有してください</p>
+    </div>
+    <p style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">プレイヤー ${S.players.length}/5</p>
+    ${pl}
+    ${S.isHost
+      ? `<button class="btn-primary mt16" data-a="startTheme" ${S.players.length >= 2 ? '' : 'disabled'}>テーマ入力を始める →</button>
+         ${S.players.length < 2 ? '<p class="dim small tc mt8">2人以上必要です</p>' : ''}`
+      : `<div class="mt16 tc" style="color:var(--text2);font-size:13px">ホストがゲームを開始するまで待ってください</div>`
+    }
+  `;
+}
+
+function renderThemeSubmit() {
+  return `
+    <div class="mb20">
+      <div class="badge mb12">THEME INPUT</div>
+      <h2 class="mb4">テーマを入力</h2>
+      <p class="dim small">2つまで入力できます（名詞のみ・20文字以内）</p>
+    </div>
+    <input id="t0" type="text" placeholder="テーマ1（例：食べ物）" maxlength="20" value="${esc(S.t0)}" class="mb8" autocomplete="off"/>
+    <input id="t1" type="text" placeholder="テーマ2（任意）"       maxlength="20" value="${esc(S.t1)}" class="mb24" autocomplete="off"/>
+    <button class="btn-primary" data-a="submitThemes">送信する →</button>
+  `;
+}
+
+function renderThemeWaiting() {
+  const pct = S.ansTotal ? (S.ansCount / S.ansTotal * 100).toFixed(0) : 0;
+  return `
+    <div class="tc" style="padding:2rem 0">
+      <div class="badge mb16">WAITING</div>
+      <h2 class="mb8">テーマを送信しました！</h2>
+      <p class="dim small mb24">他のプレイヤーを待っています</p>
+      <div class="waiting-pulse mb24"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      <p class="dim small mb8">${S.ansCount} / ${S.ansTotal} 人が送信済み</p>
+      <div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+    </div>
+  `;
+}
+
+function renderThemeReview() {
+  const ok = S.themes.length >= 5;
+  const items = S.themes.map(t => `
+    <div class="player-row mb6">
+      <div class="row" style="gap:8px">
+        <span style="font-size:14px">${esc(t.name)}</span>
+        <span>${stars(t.s)}</span>
+        <span class="dim small">+${1+t.s}点</span>
+      </div>
+      ${S.isHost ? `<button class="btn-danger" data-a="removeTheme" data-name="${esc(t.name)}">削除</button>` : ''}
+    </div>`).join('');
+  return `
+    <div class="mb20">
+      <div class="badge mb12">THEME REVIEW</div>
+      <h2 class="mb4">テーマ確認</h2>
+      <p class="dim small">${S.themes.length}個のテーマ（5ラウンド分必要）</p>
+    </div>
+    <div style="max-height:55vh;overflow-y:auto;margin-bottom:12px">${items}</div>
+    ${S.isHost
+      ? `<button class="btn-primary" data-a="startGame" ${ok?'':'disabled'}>ゲーム開始！</button>
+         ${!ok?'<p class="dim small tc mt8">テーマが足りません</p>':''}`
+      : `<div class="tc dim small">ホストがゲームを開始するまで待ってください</div>`
+    }
+  `;
+}
+
+function renderCountdown() {
+  const r = 54, circ = (2 * Math.PI * r).toFixed(1);
+  const offset = (circ * S.cdSec / 8).toFixed(1);
+  return `
+    <div class="tc" style="padding:0.5rem 0">
+      <div class="row" style="justify-content:center;gap:8px;margin-bottom:20px">
+        <div class="badge">ROUND ${S.curRound} / ${S.totalRounds}</div>
+        ${S.isFinal ? '<div class="badge badge-accent">FINAL × 2倍</div>' : ''}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:28px">
+        <div class="keyword-box">
+          <div class="kw-label">テーマ</div>
+          <div class="kw-main" style="font-size:20px">${esc(S.curTheme?.name)}</div>
+          <div style="margin-top:4px">${stars(S.curTheme?.s||1)}</div>
+        </div>
+        <div class="keyword-box">
+          <div class="kw-label">形容詞</div>
+          <div class="kw-main accent" style="font-size:18px">${esc(S.curAdj)}</div>
+        </div>
+      </div>
+      <div class="cd-wrap">
+        <svg width="128" height="128">
+          <circle cx="64" cy="64" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="6"/>
+          <circle id="cd-arc" cx="64" cy="64" r="${r}" fill="none" stroke="var(--accent)" stroke-width="6"
+            stroke-dasharray="${circ}" stroke-dashoffset="${offset}"
+            stroke-linecap="round" transform="rotate(-90 64 64)"
+            style="transition:stroke-dashoffset 0.9s linear"/>
+        </svg>
+        <span id="cd-num" class="cd-num">${S.cdSec}</span>
+      </div>
+      <p class="dim small mt16">頭の中で答えを考えよう！</p>
+    </div>
+  `;
+}
+
+function renderAnswer() {
+  return `
+    <div class="mb20">
+      <div class="badge mb12">YOUR ANSWER</div>
+      <h2 class="mb4">回答してください</h2>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px">
+      <div class="keyword-box">
+        <div class="kw-label">テーマ</div>
+        <div class="kw-main" style="font-size:18px">${esc(S.curTheme?.name)}</div>
+      </div>
+      <div class="keyword-box">
+        <div class="kw-label">形容詞</div>
+        <div class="kw-main accent" style="font-size:18px">${esc(S.curAdj)}</div>
+      </div>
+    </div>
+    <p style="font-size:13px;font-weight:500;margin-bottom:8px">固有名詞で答えてください</p>
+    <input id="answerInput" type="text" placeholder="回答を入力（30文字以内）" maxlength="30" value="${esc(S.answerInput)}" class="mb16" autocomplete="off" autofocus/>
+    <button class="btn-primary" data-a="submitAnswer">回答する →</button>
+  `;
+}
+
+function renderAnswerWaiting() {
+  const pct = S.ansTotal ? ((S.ansCount + 1) / S.ansTotal * 100).toFixed(0) : 0;
+  return `
+    <div class="tc" style="padding:2rem 0">
+      <div class="badge badge-accent mb16">SUBMITTED</div>
+      <h2 class="mb8">回答を送信しました！</h2>
+      <p class="dim small mb24">全員の回答が揃うまで待ってください</p>
+      <div class="waiting-pulse mb24"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      <p class="dim small mb8">${S.ansCount + 1} / ${S.ansTotal} 人が回答済み</p>
+      <div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+    </div>
+  `;
+}
+
+function renderVoting() {
+  const cnt = {};
+  for (const a of S.answers) { const k = a.v.trim().toLowerCase(); cnt[k] = (cnt[k]||0)+1; }
+  const mult = S.isFinal ? 2 : 1;
+  const base = 1 + (S.curTheme?.s || 1);
+
+  const answerList = S.answers.map(a => {
+    const dupe = cnt[a.v.trim().toLowerCase()] > 1;
+    return `
+      <div class="answer-row ${dupe ? 'dupe' : ''}">
+        <div>
+          <p class="dim small mb4">${esc(a.pn)}${a.pid === S.myId ? ' (あなた)' : ''}</p>
+          <p style="font-size:17px;font-weight:700">${esc(a.v)}</p>
+        </div>
+        <div class="tc">
+          ${dupe
+            ? '<span class="badge badge-danger">被り</span>'
+            : `<span style="font-size:20px;font-weight:700;color:var(--accent)">+${base*mult}</span>`}
+        </div>
+      </div>`;
+  }).join('');
+
+  const votable = S.answers.filter(a => a.pid !== S.myId);
+  const voteButtons = votable.map(a => `
+    <button class="vote-btn" data-a="vote" data-tid="${a.pid}">
+      <div>
+        <p class="dim small mb4">${esc(a.pn)}</p>
+        <p style="font-size:15px;font-weight:500">${esc(a.v)}</p>
+      </div>
+      <span class="dim">+1 →</span>
+    </button>`).join('');
+
+  return `
+    <div class="mb16">
+      <div class="badge mb12">REVEAL</div>
+      <h2 class="mb4">回答発表！</h2>
+      <p class="dim small">${esc(S.curTheme?.name)} × <span style="color:var(--accent)">${esc(S.curAdj)}</span>${S.isFinal ? ' — 最終ラウンド（2倍）' : ''}</p>
+    </div>
+    ${answerList}
+    <div style="height:1px;background:var(--border);margin:16px 0"></div>
+    <p style="font-size:13px;font-weight:500;margin-bottom:10px">一番いい回答に投票（+1ボーナス）</p>
+    ${voteButtons}
+    <button class="btn-ghost mt8" data-a="skipVote">スキップ</button>
+  `;
+}
+
+function renderVoteWaiting() {
+  const pct = S.voteTotal ? (S.voteCount / S.voteTotal * 100).toFixed(0) : 0;
+  return `
+    <div class="tc" style="padding:2rem 0">
+      <div class="badge badge-accent mb16">VOTED</div>
+      <h2 class="mb8">投票しました！</h2>
+      <p class="dim small mb24">全員の投票を集計中...</p>
+      <div class="waiting-pulse mb24"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+      <p class="dim small mb8">${S.voteCount} / ${S.voteTotal} 人が投票済み</p>
+      <div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%"></div></div>
+    </div>
+  `;
+}
+
+function renderRoundResult() {
+  const sorted = [...S.players].sort((a,b) => (S.totalScores[b.id]||0) - (S.totalScores[a.id]||0));
+  const items = sorted.map((p, i) => {
+    const rp = S.roundScores[p.id] || 0;
+    return `
+      <div class="score-row">
+        <div class="row" style="gap:12px">
+          <span class="mono dim" style="font-size:18px;min-width:22px">${i+1}</span>
+          <span style="font-size:15px">${esc(p.name)}</span>
+          ${p.id === S.myId ? '<span class="dim small">（あなた）</span>' : ''}
+        </div>
+        <div class="tc">
+          <span style="font-size:20px;font-weight:700">${S.totalScores[p.id]||0}</span>
+          <span class="dim small"> pt</span>
+          ${rp > 0 ? `<div style="font-size:11px;color:var(--success)">+${rp}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+  const isLast = S.curRound >= S.totalRounds;
+  return `
+    <div class="mb20">
+      <div class="badge mb12">ROUND ${S.curRound} RESULT</div>
+      <h2>スコア</h2>
+    </div>
+    <div class="mb16">${items}</div>
+    ${S.isHost
+      ? `<button class="btn-primary" data-a="nextRound">${isLast ? '最終結果を見る →' : '次のラウンドへ →'}</button>`
+      : `<div class="tc dim small">ホストが次のラウンドを開始するまで待ってください</div>`
+    }
+  `;
+}
+
+function renderGameOver() {
+  const sorted = [...S.players].sort((a,b) => (S.totalScores[b.id]||0) - (S.totalScores[a.id]||0));
+  const maxPts = S.totalScores[sorted[0]?.id] || 0;
+  const items = sorted.map((p, i) => {
+    const isWinner = i === 0 && (S.totalScores[p.id]||0) === maxPts;
+    return `
+      <div class="score-row ${isWinner ? 'winner' : ''}">
+        <div class="row" style="gap:12px">
+          <span class="mono" style="font-size:24px;font-weight:700;min-width:30px;color:${i===0?'var(--accent)':'var(--text2)'}">${i+1}</span>
+          <div>
+            <p style="font-size:16px;font-weight:500">${esc(p.name)}</p>
+            ${isWinner ? '<p style="font-size:11px;color:var(--accent)">優勝！</p>' : ''}
+            ${p.id === S.myId ? '<p class="dim small">（あなた）</p>' : ''}
+          </div>
+        </div>
+        <div>
+          <span style="font-size:28px;font-weight:700">${S.totalScores[p.id]||0}</span>
+          <span class="dim small"> pt</span>
+        </div>
+      </div>`;
+  }).join('');
+  return `
+    <div class="tc mb24">
+      <div class="badge badge-accent mb12">GAME OVER</div>
+      <h1 style="font-size:32px;margin-bottom:4px">お疲れ様！</h1>
+      <p class="dim small">最終結果</p>
+    </div>
+    ${items}
+    <button class="btn-ghost mt24" data-a="reload">もう一度プレイ</button>
+  `;
+}
+
+// ─── Utils ────────────────────────────────────────────────────────────────────
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function showToast(msg, duration = 3000) {
+  const wrap = document.getElementById('toast-wrap');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  wrap.appendChild(t);
+  setTimeout(() => t.remove(), duration);
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
