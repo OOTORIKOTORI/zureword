@@ -80,12 +80,10 @@ function startRound(room) {
   room.votes   = new Map();
   for (const p of room.players.values()) { p.answered = false; p.voted = false; }
 
-  const avail = room.themes.filter(t => !room.usedThemes.includes(t.name));
-  const theme  = avail[Math.floor(Math.random() * avail.length)];
+  const theme  = room.themes[Math.floor(Math.random() * room.themes.length)];
   const adj    = ADJ[Math.floor(Math.random() * ADJ.length)];
   room.curTheme = theme;
   room.curAdj   = adj;
-  room.usedThemes.push(theme.name);
   room.phase = 'countdown';
 
   bcast(room, {
@@ -197,14 +195,14 @@ wss.on('connection', ws => {
           themePerPlayer: 2,
           commonThemeCount: 6,
           themes: sampleThemes(6),
-          usedThemes: [], round: 0,
+          round: 0,
           curTheme: null, curAdj: null,
           answers: new Map(), votes: new Map(),
           cdTimer: null, ansTimer: null
         };
         r.totalRounds = [3, 5, 7].includes(msg.totalRounds) ? msg.totalRounds : 5;
         r.answerSec = [15, 30, 60].includes(msg.answerSec) ? msg.answerSec : 30;
-        r.themePerPlayer = [0, 1, 2].includes(msg.themePerPlayer) ? msg.themePerPlayer : 2;
+        r.themePerPlayer = [0, 1, 2, 3, 5].includes(msg.themePerPlayer) ? msg.themePerPlayer : 2;
         r.commonThemeCount = (Number.isInteger(msg.commonThemeCount) && msg.commonThemeCount >= 0 && msg.commonThemeCount <= BASE_THEMES.length)
           ? msg.commonThemeCount
           : 6;
@@ -280,8 +278,8 @@ wss.on('connection', ws => {
 
       case 'startGame': {
         if (!room || room.hostId !== pid || room.phase !== 'theme_review') return;
-        if (room.themes.length < room.totalRounds) {
-          return send(ws, { type: 'error', message: `テーマが${room.totalRounds}個以上必要です` });
+        if (room.themes.length < 1) {
+          return send(ws, { type: 'error', message: 'テーマが1つ以上必要です' });
         }
         for (const p of room.players.values()) p.score = 0;
         startRound(room);
