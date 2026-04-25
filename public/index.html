@@ -410,7 +410,11 @@ function stars(n) {
   return `<span class="stars-on">${'★'.repeat(n)}</span><span class="stars-off">${'★'.repeat(3-n)}</span>`;
 }
 
+const STAMPS = ['👍', '🔥', '😅', '😌', '🗑️'];
+
 function renderConnect() {
+  if (a === 'stampTheme') { wsSend({ type: 'stampTheme', name: d.name, stamp: d.stamp }); return; }
+  if (a === 'changeStars') { wsSend({ type: 'changeStars', name: d.name, stars: Number(d.stars) }); return; }
   const isCreate = S.mode === 'create';
   const toggleRow = (label, key, opts, suffix = '') => `
     <div class="mb12">
@@ -513,15 +517,50 @@ function renderThemeWaiting() {
 
 function renderThemeReview() {
   const ok = S.themes.length >= 1;
-  const items = S.themes.map(t => `
-    <div class="player-row mb6">
-      <div class="row" style="gap:8px">
-        <span style="font-size:14px">${esc(t.name)}</span>
-        <span>${stars(t.s)}</span>
-        <span class="dim small">+${1+t.s}点</span>
-      </div>
-      ${S.isHost ? `<button class="btn-danger" data-a="removeTheme" data-name="${esc(t.name)}">削除</button>` : ''}
-    </div>`).join('');
+  const items = S.themes.map(t => {
+    const myStamp = t.stamps?.[S.myId];
+    return `
+      <div class="card mb8" style="padding:12px 14px">
+        <div class="row jb" style="gap:8px;align-items:flex-start">
+          <div>
+            <div class="row" style="gap:8px;flex-wrap:wrap">
+              <span style="font-size:14px">${esc(t.name)}</span>
+              <span>${stars(t.s)}</span>
+              <span class="dim small">+${1+t.s}点</span>
+            </div>
+            ${S.isHost ? `
+              <div style="display:flex; gap:4px; margin-top:8px;">
+                ${[1,2,3].map(n => `
+                  <button data-a="changeStars" data-name="${esc(t.name)}" data-stars="${n}" style="
+                    padding: 4px 10px; font-size: 13px; border-radius: 6px;
+                    background: ${t.s === n ? 'var(--accent)' : 'var(--bg3)'};
+                    color: ${t.s === n ? '#1a1a2e' : 'var(--text2)'};
+                    border: 1px solid ${t.s === n ? 'transparent' : 'var(--border)'};
+                  ">★${n}</button>
+                `).join('')}
+              </div>
+            ` : ''}
+            <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:10px;">
+              ${STAMPS.map(emoji => {
+                const count = Object.values(t.stamps || {}).filter(s => s === emoji).length;
+                const isMe = myStamp === emoji;
+                return `
+                  <button data-a="stampTheme" data-name="${esc(t.name)}" data-stamp="${emoji}" style="
+                    padding: 5px 10px; font-size: 13px; border-radius: 20px;
+                    background: ${isMe ? 'var(--accent-dim)' : 'var(--bg3)'};
+                    border: 1px solid ${isMe ? 'var(--accent-border)' : 'var(--border)'};
+                    color: var(--text);
+                    display: flex; align-items: center; gap: 4px;
+                  ">
+                    ${emoji}${count > 0 ? `<span style="font-size:11px; color:var(--text2);">${count}</span>` : ''}
+                  </button>`;
+              }).join('')}
+            </div>
+          </div>
+          ${S.isHost ? `<button class="btn-danger" data-a="removeTheme" data-name="${esc(t.name)}">削除</button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
   return `
     <div class="mb20">
       <div class="badge mb12">THEME REVIEW</div>

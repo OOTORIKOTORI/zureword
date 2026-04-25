@@ -69,7 +69,7 @@ function clearTimers(room) {
 
 function sampleThemes(n) {
   const shuffled = [...BASE_THEMES].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, n).map(t => ({ ...t }));
+  return shuffled.slice(0, n).map(t => ({ ...t, stamps: {} }));
 }
 
 function calcScores(room) {
@@ -296,7 +296,7 @@ wss.on('connection', ws => {
         const p = room.players.get(pid);
         if (!p || p.themeSubmitted) return;
         const themes = (msg.themes || []).map(t => (t || '').trim().slice(0, 20)).filter(Boolean).slice(0, room.themePerPlayer);
-        for (const t of themes) room.themes.push({ name: t, s: 2 });
+        for (const t of themes) room.themes.push({ name: t, s: 2, stamps: {} });
         p.themeSubmitted = true;
         const done = [...room.players.values()].filter(p => p.themeSubmitted).length;
         bcast(room, { type: 'themeProgress', done, total: room.players.size });
@@ -304,6 +304,33 @@ wss.on('connection', ws => {
           room.phase = 'theme_review';
           bcast(room, { type: 'themeReview', themes: room.themes });
         }
+        break;
+      }
+
+      case 'stampTheme': {
+        if (!room || room.phase !== 'theme_review') return;
+        const theme = room.themes.find(t => t.name === msg.name);
+        if (!theme) return;
+        if (!theme.stamps || typeof theme.stamps !== 'object') theme.stamps = {};
+
+        if (theme.stamps[pid] === msg.stamp) {
+          delete theme.stamps[pid];
+        } else {
+          theme.stamps[pid] = msg.stamp;
+        }
+
+        bcast(room, { type: 'themeReview', themes: room.themes });
+        break;
+      }
+
+      case 'changeStars': {
+        if (!room || room.phase !== 'theme_review') return;
+        if (room.hostId !== pid) return;
+        const theme = room.themes.find(t => t.name === msg.name);
+        if (!theme) return;
+        if (![1, 2, 3].includes(msg.stars)) return;
+        theme.s = msg.stars;
+        bcast(room, { type: 'themeReview', themes: room.themes });
         break;
       }
 
