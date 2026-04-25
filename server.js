@@ -72,12 +72,59 @@ function sampleThemes(n) {
   return shuffled.slice(0, n).map(t => ({ ...t }));
 }
 
+function calcScores(room) {
+  const answers = [...room.answers.entries()].map(([pid, v]) => ({ pid, v }));
+  const cnt = {};
+  for (const a of answers) {
+    if (room.withdrawn.has(a.pid)) continue;
+    const k = a.v.trim().toLowerCase();
+    cnt[k] = (cnt[k] || 0) + 1;
+  }
+
+  const mult = room.round === room.totalRounds ? 2 : 1;
+  const base = 1 + room.curTheme.s;
+  const rs = {};
+  for (const p of room.players.values()) rs[p.id] = 0;
+  for (const a of answers) {
+    if (room.withdrawn.has(a.pid)) continue;
+    if (cnt[a.v.trim().toLowerCase()] === 1) rs[a.pid] = base * mult;
+  }
+
+  const vc = {};
+  for (const [, t] of room.votes) {
+    if (t && !room.withdrawn.has(t)) vc[t] = (vc[t] || 0) + 1;
+  }
+  const mv = Object.values(vc).length ? Math.max(...Object.values(vc)) : 0;
+  if (mv > 0) {
+    for (const [id, c] of Object.entries(vc)) {
+      if (c === mv) rs[id] = (rs[id] || 0) + 1;
+    }
+  }
+
+  for (const [id, pts] of Object.entries(rs)) {
+    const p = room.players.get(id);
+    if (p) p.score += pts;
+  }
+
+  return rs;
+}
+
+function getRoundAnswers(room) {
+  return [...room.answers.entries()].map(([pid, v]) => ({
+    pid,
+    pn: room.players.get(pid)?.name ?? '?',
+    v,
+    withdrawn: room.withdrawn.has(pid)
+  }));
+}
+
 // ─── Game Logic ───────────────────────────────────────────────────────────────
 
 function startRound(room) {
   room.round++;
   room.answers = new Map();
   room.votes   = new Map();
+  room.withdrawn = new Set();
   for (const p of room.players.values()) { p.answered = false; p.voted = false; }
 
   const theme  = room.themes[Math.floor(Math.random() * room.themes.length)];
@@ -108,10 +155,26 @@ function startRound(room) {
 
 function finalizeAnswers(room) {
   clearTimers(room);
+
+  if (room.players.size === 2) {
+    room.phase = 'round_result';
+    const rs = calcScores(room);
+    const totalScores = {};
+    for (const p of room.players.values()) totalScores[p.id] = p.score;
+    bcast(room, {
+      type: 'roundResult',
+      roundScores: rs,
+      totalScores,
+      players: pubPlayers(room),
+      round: room.round,
+      totalRounds: room.totalRounds,
+      answers: getRoundAnswers(room),
+    });
+    return;
+  }
+
   room.phase = 'voting';
-  const answers = [...room.answers.entries()].map(([pid, v]) => ({
-    pid, pn: room.players.get(pid)?.name ?? '?', v
-  }));
+  const answers = getRoundAnswers(room);
   bcast(room, {
     type: 'votingPhase',
     answers,
@@ -124,36 +187,7 @@ function finalizeAnswers(room) {
 
 function finalizeVotes(room) {
   room.phase = 'round_result';
-
-  const answers = [...room.answers.entries()].map(([pid, v]) => ({ pid, v }));
-  const cnt = {};
-  for (const a of answers) {
-    const k = a.v.trim().toLowerCase();
-    cnt[k] = (cnt[k] || 0) + 1;
-  }
-
-  const mult = room.round === room.totalRounds ? 2 : 1;
-  const base = 1 + room.curTheme.s;
-  const rs = {};
-  for (const p of room.players.values()) rs[p.id] = 0;
-  for (const a of answers) {
-    if (cnt[a.v.trim().toLowerCase()] === 1) rs[a.pid] = base * mult;
-  }
-
-  // 投票ボーナス
-  const vc = {};
-  for (const [, t] of room.votes) if (t) vc[t] = (vc[t] || 0) + 1;
-  const mv = Object.values(vc).length ? Math.max(...Object.values(vc)) : 0;
-  if (mv > 0) {
-    for (const [id, c] of Object.entries(vc)) {
-      if (c === mv) rs[id] = (rs[id] || 0) + 1;
-    }
-  }
-
-  for (const [id, pts] of Object.entries(rs)) {
-    const p = room.players.get(id);
-    if (p) p.score += pts;
-  }
+  const rs = calcScores(room);
 
   const totalScores = {};
   for (const p of room.players.values()) totalScores[p.id] = p.score;
@@ -201,7 +235,7 @@ wss.on('connection', ws => {
           themes: sampleThemes(6),
           round: 0,
           curTheme: null, curAdj: null,
-          answers: new Map(), votes: new Map(),
+          answers: new Map(), votes: new Map(), withdrawn: new Set(),
           cdTimer: null, ansTimer: null
         };
         r.totalRounds = [3, 5, 7].includes(msg.totalRounds) ? msg.totalRounds : 5;
@@ -315,6 +349,20 @@ wss.on('connection', ws => {
         room.votes.set(pid, targetId || null);
         bcast(room, { type: 'voteProgress', count: room.votes.size, total: room.players.size });
         if (room.votes.size >= room.players.size) finalizeVotes(room);
+        break;
+      }
+
+      case 'withdrawAnswer': {
+        if (!room || room.phase !== 'voting') return;
+        if (!room.answers.has(pid)) return;
+
+        if (room.withdrawn.has(pid)) {
+          room.withdrawn.delete(pid);
+        } else {
+          room.withdrawn.add(pid);
+        }
+
+        send(ws, { type: 'withdrawUpdated', withdrawn: room.withdrawn.has(pid) });
         break;
       }
 

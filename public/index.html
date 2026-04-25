@@ -128,6 +128,7 @@ let S = {
   cdSec: 3,
   cdTimer: null,
   answers: [],
+  myWithdrawn: false,
   roundScores: {},
   totalScores: {},
   ansCount: 0, ansTotal: 0,
@@ -204,6 +205,7 @@ function handleMsg(msg) {
       S.isFinal   = msg.isFinal;
       S.answered  = false;
       S.voted     = false;
+      S.myWithdrawn = false;
       S.cdSec     = 3;
       S.screen    = 'countdown';
       S.cdTimer   = setInterval(() => {
@@ -258,9 +260,15 @@ function handleMsg(msg) {
       S.curTheme  = msg.theme;
       S.curAdj    = msg.adj;
       S.isFinal   = msg.isFinal;
+      S.myWithdrawn = false;
       S.voteCount = 0; S.voteTotal = S.players.length;
       S.voted     = false;
       S.screen    = 'voting';
+      break;
+
+    case 'withdrawUpdated':
+      S.myWithdrawn = msg.withdrawn;
+      render();
       break;
 
     case 'voteProgress':
@@ -272,6 +280,7 @@ function handleMsg(msg) {
       S.roundScores = msg.roundScores;
       S.totalScores = msg.totalScores;
       S.players     = msg.players;
+      S.answers     = msg.answers || [];
       S.curRound    = msg.round;
       S.totalRounds = msg.totalRounds;
       S.screen      = 'round_result';
@@ -390,6 +399,7 @@ function handleAction(e) {
   }
   if (a === 'vote')     { wsSend({ type: 'vote', targetId: d.tid }); S.voted = true; S.screen = 'vote_waiting'; render(); return; }
   if (a === 'skipVote') { wsSend({ type: 'vote', targetId: null }); S.voted = true; S.screen = 'vote_waiting'; render(); return; }
+  if (a === 'toggleWithdraw') { wsSend({ type: 'withdrawAnswer' }); return; }
   if (a === 'nextRound') { wsSend({ type: 'nextRound' }); return; }
   if (a === 'reload') { location.reload(); return; }
 }
@@ -605,20 +615,40 @@ function renderAnswerWaiting() {
 
 function renderVoting() {
   const cnt = {};
-  for (const a of S.answers) { const k = a.v.trim().toLowerCase(); cnt[k] = (cnt[k]||0)+1; }
+  for (const a of S.answers) {
+    if (a.withdrawn) continue;
+    const k = a.v.trim().toLowerCase();
+    cnt[k] = (cnt[k]||0)+1;
+  }
   const mult = S.isFinal ? 2 : 1;
   const base = 1 + (S.curTheme?.s || 1);
 
   const answerList = S.answers.map(a => {
-    const dupe = cnt[a.v.trim().toLowerCase()] > 1;
+    const isMyWithdrawn = a.pid === S.myId && S.myWithdrawn;
+    const withdrawn = a.withdrawn || isMyWithdrawn;
+    const dupe = !withdrawn && cnt[a.v.trim().toLowerCase()] > 1;
     return `
-      <div class="answer-row ${dupe ? 'dupe' : ''}">
+      <div class="answer-row ${dupe || withdrawn ? 'dupe' : ''}">
         <div>
           <p class="dim small mb4">${esc(a.pn)}${a.pid === S.myId ? ' (あなた)' : ''}</p>
           <p style="font-size:17px;font-weight:700">${esc(a.v)}</p>
+          ${a.pid === S.myId ? `
+            <button data-a="toggleWithdraw" style="
+              font-size: 12px;
+              padding: 4px 10px;
+              margin-top: 6px;
+              background: ${S.myWithdrawn ? 'var(--danger-dim)' : 'var(--bg3)'};
+              color: ${S.myWithdrawn ? 'var(--danger)' : 'var(--text2)'};
+              border: 1px solid ${S.myWithdrawn ? 'rgba(230,57,70,0.3)' : 'var(--border)'};
+              border-radius: 6px;
+              cursor: pointer;
+            ">${S.myWithdrawn ? '↩ 取り下げ取り消し' : '🙋 自己申告（取り下げ）'}</button>
+          ` : ''}
         </div>
         <div class="tc">
-          ${dupe
+          ${withdrawn
+            ? '<span class="badge badge-danger">取り下げ済み</span>'
+            : dupe
             ? '<span class="badge badge-danger">被り</span>'
             : `<span style="font-size:20px;font-weight:700;color:var(--accent)">+${base*mult}</span>`}
         </div>
@@ -665,6 +695,16 @@ function renderVoteWaiting() {
 
 function renderRoundResult() {
   const sorted = [...S.players].sort((a,b) => (S.totalScores[b.id]||0) - (S.totalScores[a.id]||0));
+  const answers = S.answers.length ? S.answers.map(a => `
+    <div class="answer-row ${a.withdrawn ? 'dupe' : ''}">
+      <div>
+        <p class="dim small mb4">${esc(a.pn)}${a.pid === S.myId ? ' (あなた)' : ''}</p>
+        <p style="font-size:17px;font-weight:700">${esc(a.v)}</p>
+      </div>
+      <div class="tc">
+        ${a.withdrawn ? '<span class="badge badge-danger">取り下げ済み</span>' : ''}
+      </div>
+    </div>`).join('') : '';
   const items = sorted.map((p, i) => {
     const rp = S.roundScores[p.id] || 0;
     return `
@@ -687,6 +727,7 @@ function renderRoundResult() {
       <div class="badge mb12">ROUND ${S.curRound} RESULT</div>
       <h2>スコア</h2>
     </div>
+    ${answers ? `<div class="mb16">${answers}</div>` : ''}
     <div class="mb16">${items}</div>
     ${S.isHost
       ? `<button class="btn-primary" data-a="nextRound">${isLast ? '最終結果を見る →' : '次のラウンドへ →'}</button>`
